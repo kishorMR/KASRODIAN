@@ -192,11 +192,27 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .rail-progress{position:absolute;left:var(--gut);right:var(--gut);bottom:26px;height:1px;background:var(--line)}
 .rail-progress i{display:block;height:100%;width:0;background:var(--gold)}
 @media(max-width:760px){
-  .rail-sticky{height:auto;position:static;padding:72px 0}
-  .rail-track{transform:none!important;flex-direction:column;gap:30px}
-  .panel,.panel.intro{width:100%}
-  .rail-progress{display:none}
+  .rail-sticky{height:auto;position:static;padding:56px 0 30px}
+  .rail-track{
+    transform:none!important;flex-direction:row;gap:16px;
+    overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:var(--gut);
+    -webkit-overflow-scrolling:touch;padding-bottom:8px;
+  }
+  .rail-track::-webkit-scrollbar{display:none}
+  .rail-track{scrollbar-width:none}
+  .panel{scroll-snap-align:start}
+  .panel,.panel.intro{width:78vw}
+  .panel .slot{height:52vh}
+  .rail-progress{display:block;left:var(--gut);right:var(--gut);bottom:8px}
+  .swipe-hint{
+    display:flex;align-items:center;gap:8px;justify-content:center;
+    margin-top:16px;font-size:11px;color:var(--taupe);letter-spacing:.06em;
+    transition:opacity .4s var(--ease);
+  }
+  .swipe-hint svg{width:16px;height:16px;animation:swipenudge 1.6s ease-in-out infinite}
 }
+@media(min-width:761px){.swipe-hint{display:none}}
+@keyframes swipenudge{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
 
 /* ── collection grid ────────────────────────── */
 .grid{display:grid;gap:clamp(14px,2.2vw,34px);grid-template-columns:repeat(2,1fr)}
@@ -364,6 +380,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
       </article>
     </div>
     <div class="rail-progress"><i id="railBar"></i></div>
+    <div class="swipe-hint">
+      <span>swipe</span>
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
   </div>
 </section>
 
@@ -558,7 +578,7 @@ function start(){
 /* ── reveal on scroll ──────────────────────── */
 const io = new IntersectionObserver((entries)=>{
   entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
-},{threshold:.2, rootMargin:'0px 0px -8% 0px'});
+},{threshold:.12, rootMargin:'0px 0px -4% 0px'});
 document.querySelectorAll('.rv, .wipe').forEach(el=>{ if(!el.closest('.hero')) io.observe(el); });
 
 /* ── ticker ─────────────────────────────────── */
@@ -581,13 +601,18 @@ document.querySelectorAll('.rv, .wipe').forEach(el=>{ if(!el.closest('.hero')) i
   })();
 })();
 
-/* ── pinned horizontal rail ────────────────── */
+/* ── pinned horizontal rail (desktop) + swipe carousel (mobile) ── */
 (function(){
   const rail=document.getElementById('floor'), track=document.getElementById('track'), bar=document.getElementById('railBar');
   let dist=0, active=false;
   function setup(){
     active = window.innerWidth > 760 && !RM;
-    if(!active){ rail.style.height=''; track.style.transform=''; return; }
+    if(!active){
+      rail.style.height=''; track.style.transform='';
+      bindMobile();
+      return;
+    }
+    unbindMobile();
     dist = Math.max(0, track.scrollWidth - window.innerWidth + 40);
     rail.style.height = (window.innerHeight + dist) + 'px';
     render();
@@ -598,6 +623,28 @@ document.querySelectorAll('.rv, .wipe').forEach(el=>{ if(!el.closest('.hero')) i
     const p = Math.min(1, Math.max(0,(window.scrollY - top)/dist));
     track.style.transform = `translate3d(${-p*dist}px,0,0)`;
     bar.style.width = (p*100)+'%';
+  }
+  /* mobile: track scrolls natively (touch swipe), drive the same progress bar off it */
+  let mobileBound=false;
+  function onTrackScroll(){
+    const max = track.scrollWidth - track.clientWidth;
+    const p = max>0 ? track.scrollLeft/max : 0;
+    bar.style.width=(p*100)+'%';
+    if(track.scrollLeft>16){
+      const hint=document.querySelector('.swipe-hint');
+      if(hint) hint.style.opacity='0';
+    }
+  }
+  function bindMobile(){
+    if(mobileBound) return;
+    track.addEventListener('scroll',onTrackScroll,{passive:true});
+    mobileBound=true;
+    onTrackScroll();
+  }
+  function unbindMobile(){
+    if(!mobileBound) return;
+    track.removeEventListener('scroll',onTrackScroll);
+    mobileBound=false;
   }
   window.addEventListener('scroll',render,{passive:true});
   window.addEventListener('resize',setup);
@@ -620,9 +667,10 @@ document.querySelectorAll('.rv, .wipe').forEach(el=>{ if(!el.closest('.hero')) i
 (function(){
   if(RM) return;
   const fig=document.getElementById('heroFig');
+  const strength = window.innerWidth <= 760 ? 0.12 : 0.22;
   const run=()=>{
     const y=window.scrollY;
-    fig.style.transform = `translate3d(0,${y*0.22}px,0) scale(1.12)`;
+    fig.style.transform = `translate3d(0,${y*strength}px,0) scale(1.12)`;
   };
   window.addEventListener('scroll',run,{passive:true});
   run();
